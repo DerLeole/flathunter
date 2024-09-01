@@ -1,5 +1,4 @@
 """Captcha solver for CapMonster Captcha Solving Service (https://capmonster.cloud)"""
-import json
 from typing import Dict
 from time import sleep
 import backoff
@@ -8,18 +7,15 @@ import requests
 from flathunter.logging import logger
 from flathunter.captcha.captcha_solver import (
     CaptchaSolver,
-    CaptchaBalanceEmpty,
-    CaptchaUnsolvableError,
-    GeetestResponse,
     AwsAwfResponse,
-    RecaptchaResponse,
 )
+
 
 class CapmonsterSolver(CaptchaSolver):
     """Implementation of Captcha solver for CapMonster"""
-  
-    
-    def solve_awswaf(self, sitekey: str, iv: str, context: str, challenge_script: str, captcha_script: str, page_url: str) -> AwsAwfResponse:
+
+    def solve_awswaf(self, sitekey: str, iv: str, context: str, challenge_script: str, captcha_script: str,
+                     page_url: str) -> AwsAwfResponse:
         """Solves AWS WAF Captcha"""
         logger.info("Trying to solve AWS WAF.")
         params = {
@@ -48,7 +44,6 @@ class CapmonsterSolver(CaptchaSolver):
         response_json = submit_response.json()
 
         return response_json["taskId"]
-
 
     @backoff.on_exception(**CaptchaSolver.backoff_options)
     def __retrieve_capmonster_result(self, captcha_id: str):

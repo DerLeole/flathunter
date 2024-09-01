@@ -5,6 +5,7 @@ from dataclasses import dataclass
 import requests
 import backoff
 
+
 @dataclass
 class GeetestResponse:
     """Responde from GeeTest Captcha"""
@@ -12,10 +13,12 @@ class GeetestResponse:
     validate: str
     sec_code: str
 
+
 @dataclass
 class RecaptchaResponse:
     """Response from reCAPTCHA"""
     result: str
+
 
 @dataclass
 class AwsAwfResponse:
@@ -38,8 +41,9 @@ class CaptchaSolver:
     def solve_geetest(self, geetest: str, challenge: str, page_url: str) -> GeetestResponse:
         """Should be implemented in subclass"""
         raise NotImplementedError()
-    
-    def solve_awswaf(self, sitekey: str, iv: str, context: str, page_url: str) -> AwsAwfResponse:
+
+    def solve_awswaf(self, sitekey: str, iv: str, context: str, challenge_script: str, captcha_script: str,
+                     page_url: str) -> AwsAwfResponse:
         """Should be implemented in subclass"""
         raise NotImplementedError()
 
@@ -47,14 +51,18 @@ class CaptchaSolver:
         """Should be implemented in subclass"""
         raise NotImplementedError()
 
+
 class CaptchaUnsolvableError(Exception):
     """Raised when Captcha was unsolveable"""
+
     def __init__(self):
         super().__init__()
         self.message = "Failed to solve captcha."
 
+
 class CaptchaBalanceEmpty(Exception):
     """Raised when Captcha account is out of credit"""
+
     def __init__(self):
         super().__init__()
         self.message = "Captcha account balance empty."

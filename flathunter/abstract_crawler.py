@@ -197,8 +197,8 @@ class Crawler(ABC):
             raise
 
     @backoff.on_exception(wait_gen=backoff.constant,
-                        exception=CaptchaUnsolvableError,
-                        max_tries=3)
+                          exception=CaptchaUnsolvableError,
+                          max_tries=3)
     def resolve_awsawf(self, driver):
         """Resolve AWS WAF Captcha"""
 
@@ -206,15 +206,17 @@ class Crawler(ABC):
         sleep(2)
         logs_raw = driver.get_log("performance")
         logs = [json.loads(lr["message"])["message"] for lr in logs_raw]
-        
+
+        iv, context, sitekey, challenge, jsapi = None, None, None, None, None
+
         def log_filter(log_):
             return (
                 # is an actual response
-                log_["method"] == "Network.responseReceived"
-                # and json
-                and "json" in log_["params"]["response"]["mimeType"]
+                    log_["method"] == "Network.responseReceived"
+                    # and json
+                    and "json" in log_["params"]["response"]["mimeType"]
             )
-        
+
         for log in filter(log_filter, logs):
             request_id = log["params"]["requestId"]
             resp_url = log["params"]["response"]["url"]
@@ -223,8 +225,6 @@ class Crawler(ABC):
                 response_json = json.loads(response["body"])
                 iv = response_json["state"]["iv"]
                 context = response_json["state"]["payload"]
-                sitekey = response_json["key"]
-
 
         sitekey = re.findall(
             r"apiKey: \"(.*?)\"", driver.page_source)[0]
@@ -232,16 +232,22 @@ class Crawler(ABC):
         patternChallenge = r'src="([^"]*challenge\.js)"'
         challenge_matches = re.findall(patternChallenge, driver.page_source)
         for match in challenge_matches:
-            print(f'Challenge SRC Value: {match}')   
+            logger.debug(f'Challenge SRC Value: {match}')
             challenge = match
 
         patternJsApi = r'src="([^"]*jsapi\.js)"'
         jsapi_matches = re.findall(patternJsApi, driver.page_source)
         for match in jsapi_matches:
-            print(f'JsApi SRC Value: {match}')   
+            logger.debug(f'JsApi SRC Value: {match}')
             jsapi = match
 
         try:
+            missing_vars = [var_name for var_name, var_value in zip(['iv', 'context', 'sitekey', 'challenge', 'jsapi'],
+                                                                    [iv, context, sitekey, challenge, jsapi]) if
+                            var_value is None]
+            if missing_vars:
+                raise Exception(f"Missing data required to solve AWS WAF captcha: {', '.join(missing_vars)}.")
+
             captcha = self.captcha_solver.solve_awswaf(
                 sitekey,
                 iv,
@@ -250,11 +256,10 @@ class Crawler(ABC):
                 jsapi,
                 driver.current_url
             )
-            old_cookie = driver.get_cookie('aws-waf-token')
-            new_cookie = old_cookie
-            new_cookie['value'] = captcha.token
+            cookie = driver.get_cookie('aws-waf-token')
+            cookie['value'] = captcha.token
             driver.delete_cookie('aws-waf-token')
-            driver.add_cookie(new_cookie)
+            driver.add_cookie(cookie)
             sleep(1)
             driver.refresh()
         except CaptchaUnsolvableError:
